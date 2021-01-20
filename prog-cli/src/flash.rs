@@ -78,12 +78,14 @@ pub fn flash(
             opts.address
         );
 
-        ti_sbl::util::erase_flash_range(
-            device,
-            opts.address,
-            binary.len() as u32,
-        )
-        .context("Couldn't erase flash")?;
+        let len = if overwrites_ccfg {
+            binary.len() - CCFG_SIZE
+        } else {
+            binary.len()
+        };
+
+        ti_sbl::util::erase_flash_range(device, opts.address, len)
+            .context("Couldn't erase flash")?;
     }
 
     let end_addr = opts.address + binary.len() as u32;
