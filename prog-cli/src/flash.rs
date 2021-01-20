@@ -84,7 +84,7 @@ pub fn flash(
             binary.len()
         };
 
-        ti_sbl::util::erase_flash_range(device, opts.address, len)
+        ti_sbl::util::erase_flash_range(device, opts.address, len as u32)
             .context("Couldn't erase flash")?;
     }
 
