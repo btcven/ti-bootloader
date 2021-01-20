@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://locha.io/">Project Website</a> |
+  <a href="https://locha.io/">Project Website</a>
 </p>
 
 <h1 align="center">TI bootloader</h1>
