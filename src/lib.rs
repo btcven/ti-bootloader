@@ -29,9 +29,9 @@
 //! - [CC2538/CC26x0/CC26x2 Serial Bootloader Interface](https://www.ti.com/lit/an/swra466c/swra466c.pdf).
 
 use std::{
+    cmp::Ordering,
     fmt, io,
     time::{Duration, Instant},
-    cmp::Ordering,
 };
 
 use serial::SerialPort;
@@ -61,11 +61,11 @@ mod constants {
 
 pub const MAX_BYTES_PER_TRANSFER: usize = 252;
 
-pub const COMMAND_RET_SUCCESS: u8       = 0x40;
-pub const COMMAND_RET_UNKNOWN_CMD: u8   = 0x41;
-pub const COMMAND_RET_INVALID_CMD: u8   = 0x42;
-pub const COMMAND_RET_INVALID_ADR: u8   = 0x43;
-pub const COMMAND_RET_FLASH_FAIL: u8    = 0x44;
+pub const COMMAND_RET_SUCCESS: u8 = 0x40;
+pub const COMMAND_RET_UNKNOWN_CMD: u8 = 0x41;
+pub const COMMAND_RET_INVALID_CMD: u8 = 0x42;
+pub const COMMAND_RET_INVALID_ADR: u8 = 0x43;
+pub const COMMAND_RET_FLASH_FAIL: u8 = 0x44;
 
 pub mod util;
 
@@ -126,7 +126,7 @@ impl Family {
     #[inline]
     pub fn supports_set_ccfg(&self) -> bool {
         matches!(*self, Family::CC26X0 | Family::CC26X2)
-   }
+    }
 
     /// Whether the device supports `COMMAND_DOWNLOAD_CRC`.
     ///
@@ -237,13 +237,13 @@ where
             match self.port.read(&mut byte) {
                 Ok(n) if n == 0 => {
                     return Err(io::Error::new(
-                            io::ErrorKind::Other,
-                            "unexpected EOF",
+                        io::ErrorKind::Other,
+                        "unexpected EOF",
                     ));
                 }
                 Ok(_) => {
                     ack.push(byte[0]);
-                },
+                }
                 Err(e) if e.kind() == io::ErrorKind::TimedOut => {
                     log::trace!("read timed out");
                 }
@@ -251,7 +251,8 @@ where
             }
 
             if ack[ack.len() - 2] == 0x00
-                && (ack[ack.len() - 1] == constants::ACK || ack[ack.len() - 1] == constants::NACK)
+                && (ack[ack.len() - 1] == constants::ACK
+                    || ack[ack.len() - 1] == constants::NACK)
             {
                 log::trace!("ACK bytes found {:?}", &ack[2..]);
                 break;
@@ -274,7 +275,8 @@ where
     }
 
     fn write_ack(&mut self, ack: bool) -> io::Result<()> {
-        let data: [u8; 2] = [0x00, if ack { constants::ACK } else { constants::NACK }];
+        let data: [u8; 2] =
+            [0x00, if ack { constants::ACK } else { constants::NACK }];
 
         self.port.write_all(&data)?;
         self.port.flush()?;
@@ -296,22 +298,26 @@ where
 
         let payload_len = hdr[0] as usize - HDR_LEN;
         match response.len().cmp(&payload_len) {
-            Ordering::Greater => return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!(
-                    "received response is too small, expected {}, found {}",
-                    response.len(),
-                    payload_len,
-                ),
-            )),
-            Ordering::Less => return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!(
-                    "received response is too big, expected {}, found {}",
-                    response.len(),
-                    payload_len,
-                ),
-            )),
+            Ordering::Greater => {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!(
+                        "received response is too small, expected {}, found {}",
+                        response.len(),
+                        payload_len,
+                    ),
+                ))
+            }
+            Ordering::Less => {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!(
+                        "received response is too big, expected {}, found {}",
+                        response.len(),
+                        payload_len,
+                    ),
+                ))
+            }
             _ => (),
         }
 
@@ -370,7 +376,11 @@ where
     ///
     /// This command must be followed by a [`Device::get_status`] command
     /// to verify it worked.
-    pub fn download(&mut self, program_address: u32, program_size: u32) -> io::Result<()> {
+    pub fn download(
+        &mut self,
+        program_address: u32,
+        program_size: u32,
+    ) -> io::Result<()> {
         const CMD_DOWNLOAD_LEN: usize = 8;
 
         let mut data = [0u8; CMD_DOWNLOAD_LEN];
@@ -427,7 +437,8 @@ where
     /// This function will panic if the `data` length in bytes is
     /// higher than [`MAX_BYTES_PER_TRANSFER`].
     pub fn send_data<D>(&mut self, data: &D) -> io::Result<bool>
-        where D: AsRef<[u8]>
+    where
+        D: AsRef<[u8]>,
     {
         assert!(data.as_ref().len() <= MAX_BYTES_PER_TRANSFER);
 

@@ -225,7 +225,10 @@ fn main() -> Result<()> {
         .context("Couldn't read IEEE 802.15.4 address")?;
     log::info!("IEEE 802.15.4g primary address: {}", format_addr(primary));
     if secondary != ti_sbl::util::INVALID_ADDR {
-        log::info!("IEEE 802.15.4g secondary address: {}", format_addr(secondary));
+        log::info!(
+            "IEEE 802.15.4g secondary address: {}",
+            format_addr(secondary)
+        );
     }
 
     match matches.subcommand() {

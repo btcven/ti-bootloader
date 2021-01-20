@@ -21,23 +21,19 @@
 //! such as the IEEE 802.15.5g address, BLE MAC address, the flash size in
 //! bytes, etc.
 
-use std::{io, convert::TryInto};
+use std::{convert::TryInto, io};
 
 use crate::{
-    Device,
-    Family,
+    Device, Family, COMMAND_RET_FLASH_FAIL, COMMAND_RET_INVALID_ADR,
+    COMMAND_RET_INVALID_CMD, COMMAND_RET_SUCCESS, COMMAND_RET_UNKNOWN_CMD,
     MAX_BYTES_PER_TRANSFER,
-    COMMAND_RET_SUCCESS,
-    COMMAND_RET_UNKNOWN_CMD,
-    COMMAND_RET_INVALID_CMD,
-    COMMAND_RET_INVALID_ADR,
-    COMMAND_RET_FLASH_FAIL,
 };
 
 /// CC26xx/CC13xx CCFG size in bytes.
 pub const CCFG_SIZE: usize = 88;
 /// The value of an invalid IEEE/BLE address in the CCFG.
-pub const INVALID_ADDR: [u8; 8] = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
+pub const INVALID_ADDR: [u8; 8] =
+    [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
 
 const REG32_SIZE: usize = 4;
 /// FLASH.FLASH_SIZE register on CC13xx/CC26xx
@@ -68,7 +64,7 @@ where
 
         for i in 0..sector_count {
             let sector_address = start_address + (i * sector_size);
-            log::debug!("Erasing sector #{}, address: {}", i, sector_address);
+            log::info!("Erasing sector #{}, address: {:#X}", i, sector_address);
 
             device.sector_erase(sector_address)?;
 
@@ -115,7 +111,10 @@ where
         log::info!("Chunks for transfer #{}: {}", txfer_index, chunks);
 
         // Prepare device for flash download.
-        device.download(transfer.start_address, transfer.data.len().try_into().unwrap())?;
+        device.download(
+            transfer.start_address,
+            transfer.data.len().try_into().unwrap(),
+        )?;
 
         // Each download command requires to check the latest
         // status to verify it worked.
@@ -142,7 +141,12 @@ where
             let chunk = &chunk[..bytes_in_transfer];
 
             let chunk_addr = transfer.start_address + data_offset as u32;
-            log::debug!("Writing chunk #{} ({} B) at address {:#X}", chunk_index, chunk.len(), chunk_addr);
+            log::info!(
+                "Writing chunk #{} ({} B) at address {:#X}",
+                chunk_index,
+                chunk.len(),
+                chunk_addr
+            );
 
             let ack = device.send_data(&chunk)?;
             if transfer.expect_ack {
@@ -227,7 +231,9 @@ where
 }
 
 /// Read IEEE 802.15.4g MAC address.
-pub fn read_ieee_address<P>(device: &mut Device<P>) -> io::Result<([u8; 8], [u8; 8])>
+pub fn read_ieee_address<P>(
+    device: &mut Device<P>,
+) -> io::Result<([u8; 8], [u8; 8])>
 where
     P: serial::SerialPort,
 {
@@ -242,7 +248,7 @@ where
             let ccfg_offset = read_flash_size(device)? - CCFG_SIZE as u32;
 
             ccfg_offset + 0x20
-        },
+        }
     };
 
     let mut primary = [0u8; 8];
