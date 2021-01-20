@@ -1,0 +1,18 @@
+[package]
+name = "ti-sbl-prog"
+version = "0.1.0"
+authors = ["Locha Mesh Developers <locha@contact.io>"]
+edition = "2018"
+
+[dependencies]
+clap = "2"
+anyhow = "1"
+
+log = "0.4"
+env_logger = "0.8"
+
+ti-sbl = { path = "..", version = "0.1" }
+serial = "0.4"
+
+[target.'cfg(unix)'.dependencies]
+ansi_term = "0.12"

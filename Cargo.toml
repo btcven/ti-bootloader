@@ -1,0 +1,12 @@
+[package]
+name = "ti-sbl"
+version = "0.1.0"
+authors = ["Locha Mesh Developers <locha@contact.io>"]
+edition = "2018"
+
+[workspace]
+members = ["prog-cli"]
+
+[dependencies]
+serial = "0.4"
+log = "0.4"
