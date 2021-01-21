@@ -30,9 +30,9 @@ const DEFAULT_PORT: &str = "COM0";
 
 fn main() -> Result<()> {
     #[cfg(feature = "pretty-env-logger")]
-    pretty_env_logger::init_custom_env("TI_SBL_PROG");
+    pretty_env_logger::init_custom_env("TI_SBL_PROG_LOG");
     #[cfg(not(feature = "pretty-env-logger"))]
-    env_logger::init_from_env("TI_SBL_PROG");
+    env_logger::init_from_env("TI_SBL_PROG_LOG");
 
     let args = cli().get_matches_safe()?;
 
