@@ -24,9 +24,15 @@
 use std::{convert::TryInto, io};
 
 use crate::{
-    Device, Family, COMMAND_RET_FLASH_FAIL, COMMAND_RET_INVALID_ADR,
-    COMMAND_RET_INVALID_CMD, COMMAND_RET_SUCCESS, COMMAND_RET_UNKNOWN_CMD,
-    MAX_BYTES_PER_TRANSFER,
+    Device, Family,
+    constants::{
+        COMMAND_RET_FLASH_FAIL,
+        COMMAND_RET_INVALID_ADR,
+        COMMAND_RET_INVALID_CMD,
+        COMMAND_RET_SUCCESS,
+        COMMAND_RET_UNKNOWN_CMD,
+        MAX_BYTES_PER_TRANSFER,
+    },
 };
 
 /// CC26xx/CC13xx CCFG size in bytes.
@@ -87,14 +93,18 @@ where
     Ok(())
 }
 
+/// A binary data transfer
 #[derive(Debug)]
 pub struct Transfer<'a> {
+    /// The data to write on the device's flash.
     pub data: &'a [u8],
+    /// The start address in flash of this data.
     pub start_address: u32,
+    /// Whether we expect an ACK in return.
     pub expect_ack: bool,
 }
 
-/// Write the flash
+/// Write the flash.
 pub fn write_flash_range<'a, P>(
     device: &mut Device<P>,
     transfers: &[Transfer<'a>],
@@ -181,18 +191,6 @@ where
     }
 
     Ok(())
-}
-
-/// Read memory.
-pub fn memory_read_32<P>(
-    _device: &mut Device<P>,
-    _start_address: u32,
-    _data: &mut [u8],
-) -> io::Result<()>
-where
-    P: serial::SerialPort,
-{
-    todo!();
 }
 
 /// Reads the flash size from the memory.

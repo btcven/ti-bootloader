@@ -14,15 +14,11 @@
 
 #[cfg(windows)]
 use std::ffi::OsString;
-use std::{
-    io::{self, Write},
-    path::PathBuf,
-    time::Duration,
-};
+use std::{path::PathBuf, time::Duration};
 
 use serial::SerialPort;
 
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Result, bail};
 use clap::{crate_authors, crate_version, App, AppSettings, Arg, SubCommand};
 
 mod flash;
@@ -33,126 +29,29 @@ const DEFAULT_PORT: &str = "/dev/ttyACM0";
 const DEFAULT_PORT: &str = "COM0";
 
 fn main() -> Result<()> {
-    let app = App::new("TI Serial Interface Bootloader Programmer")
-        .setting(AppSettings::ColoredHelp)
-        .version(crate_version!())
-        .author(crate_authors!())
-        .about("Programmer for Texas Instruments Serial Interface Bootloader\nProject website: https://locha.io/software/ti-sbl")
-        .arg(
-            Arg::with_name("PORT")
-                .short("p")
-                .long("port")
-                .default_value(DEFAULT_PORT)
-                .required(true)
-                .help("Serial port to use")
-        )
-        .arg(
-            Arg::with_name("family")
-                .long("family")
-                .default_value("cc26x2")
-                .required(true)
-                .help("Device family [cc2538|cc26x0|cc26x2]")
-        )
-        .arg(
-            Arg::with_name("baudrate")
-                .short("b")
-                .long("baudrate")
-                .default_value("500000")
-                .required(true)
-                .help("Serial port baud rate [110|300|600|1200|2400|4800|9600|19200|38400|57600|115200|other]")
-        )
-        .arg(
-            Arg::with_name("enable-xosc")
-                .short("x")
-                .long("enable-xosc")
-                .help("Switch to XOSC (supported only on CC2538 devices)")
-        )
-        .arg(
-            Arg::with_name("bootloader-invoke")
-                .long("bl-invoke")
-                .help("Invoke the bootloader by toggling the DTR/CTS pins (on supported boards). By default DTR is connected to the bootloader pin (the pin set on CCA/CCFG) and RTS is connected to !RESET. To invert this, use --bl-inverted. The default level of the bootloader pin is active high, to use an active low polarity use --bl-active-low")
-        )
-        .arg(
-            Arg::with_name("bootloader-inverted")
-                .long("bl-inverted")
-                .help("Invert the pins when using --bl-invoke flag, this sets DTR to !RESET and RTS to bootloader pin")
-        )
-        .arg(
-            Arg::with_name("bootloader-active-low")
-                .long("bl-active-low")
-                .help("Use an active-low level when using --bl-invoke flag, this sets level of the bootloader pin to active-low")
-        )
-        .arg(
-            Arg::with_name("v")
-                .short("v")
-                .multiple(true)
-                .help("Sets the level of verbosity, -v (debug), -vv (trace)")
-        )
-        .subcommand(
-            SubCommand::with_name("flash")
-                .about("Flash a binary file")
-                .setting(AppSettings::ColoredHelp)
-                .arg(
-                    Arg::with_name("BIN")
-                        .required(true)
-                        .takes_value(true)
-                        .help("Binary file to flash")
-                )
-                .arg(
-                    Arg::with_name("address")
-                        .short("a")
-                        .long("address")
-                        .required(true)
-                        .default_value("0x00000000")
-                        .help("Address in memory where the binary contents will be flashed")
-                )
-                .arg(
-                    Arg::with_name("write-erase")
-                        .short("e")
-                        .long("write-erase")
-                        .help("Erase first before writing the binary contents, this will erase up to N bytes where N is the binary file size at the specified --address")
-                )
-                .arg(
-                    Arg::with_name("force")
-                        .short("f")
-                        .long("force")
-                        .help("Force the write of the CCFG. Note: depending on the values of the binary file, you may end up locking yourself out of the device.")
-                )
-        );
+    #[cfg(feature = "pretty-env-logger")]
+    pretty_env_logger::init_custom_env("TI_SBL_PROG");
+    #[cfg(not(feature = "pretty-env-logger"))]
+    env_logger::init_from_env("TI_SBL_PROG");
 
-    // When double clicking the binary the binary will be paused. Useful on
-    // windows, since the Console window will be closed inmediately.
-    #[cfg(windows)]
-    let app = app.setting(AppSettings::WaitOnError);
-
-    let matches = app.get_matches();
-
-    init_logger(match matches.occurrences_of("v") {
-        0 => log::LevelFilter::Info,
-        1 => log::LevelFilter::Debug,
-        2..=u64::MAX => log::LevelFilter::Trace,
-    })?;
+    let args = cli().get_matches_safe()?;
 
     // Sanity checks first
-    if matches.is_present("bootloader-inverted")
-        && !matches.is_present("bootloader-invoke")
-    {
-        anyhow::bail!("--bl-inverted can't be used if --bl-invoke is not specified. See --help for more information");
+    if args.is_present("bl-inverted") && !args.is_present("bl-invoke") {
+        bail!("--bl-inverted can't be used if --bl-invoke is not specified. See --help for more information");
     }
 
-    if matches.is_present("bootloader-active-low")
-        && !matches.is_present("bootloader-invoke")
-    {
-        anyhow::bail!("--bl-active-low can't be used if --bl-invoke is not specified. See --help for more information");
+    if args.is_present("bl-active-low") && !args.is_present("bl-invoke") {
+        bail!("--bl-active-low can't be used if --bl-invoke is not specified. See --help for more information");
     }
 
-    let opts = Opts {
+    let global_args = GlobalArgs {
         #[cfg(unix)]
-        port: matches.value_of("PORT").unwrap().parse()?,
+        port: args.value_of("port").unwrap().parse()?,
         #[cfg(windows)]
-        port: matches.value_of("PORT").unwrap().map(OsString::from),
-        family: family_from_str(matches.value_of("family").unwrap())?,
-        baudrate: matches.value_of("baudrate").unwrap().parse::<usize>().map(
+        port: args.value_of("port").unwrap().map(OsString::from),
+        family: args.value_of("family").unwrap().parse()?,
+        baudrate: args.value_of("baudrate").unwrap().parse::<usize>().map(
             |v| match v {
                 110 => serial::BaudRate::Baud110,
                 300 => serial::BaudRate::Baud300,
@@ -168,40 +67,40 @@ fn main() -> Result<()> {
                 n => serial::BaudRate::BaudOther(n),
             },
         )?,
-        enable_xosc: matches.is_present("enable-xosc"),
-        bootloader_invoke: matches.is_present("bootloader-invoke"),
-        bootloader_inverted: matches.is_present("bootloader-inverted"),
-        bootloader_active_low: matches.is_present("bootloader-active-low"),
+        enable_xosc: args.is_present("enable-xosc"),
+        bootloader_invoke: args.is_present("bl-invoke"),
+        bootloader_inverted: args.is_present("bl-inverted"),
+        bootloader_active_low: args.is_present("bl-active-low"),
     };
 
-    if opts.enable_xosc && !opts.family.supports_set_xosc() {
+    if global_args.enable_xosc && !global_args.family.supports_set_xosc() {
         anyhow::bail!("XOSC can only be enabled on CC2538 family");
     }
 
-    log::info!("Opening serial port `{}`", opts.port_to_string());
-    log::info!("Baudrate: {}", baudrate_to_usize(opts.baudrate));
-    let mut port = serial::SystemPort::open(&opts.port).with_context(|| {
-        format!("Couldn't open serial port `{}`", opts.port_to_string())
+    log::info!("Opening serial port `{}`", global_args.port_to_string());
+    log::info!("Baudrate: {}", baudrate_to_usize(global_args.baudrate));
+    let mut port = serial::SystemPort::open(&global_args.port).with_context(|| {
+        format!("Couldn't open serial port `{}`", global_args.port_to_string())
     })?;
 
     let mut settings = ti_sbl::port_settings();
-    settings.baud_rate = opts.baudrate;
+    settings.baud_rate = global_args.baudrate;
 
     port.set_timeout(Duration::from_millis(200))?;
     port.configure(&settings)?;
 
-    if opts.bootloader_invoke {
+    if global_args.bootloader_invoke {
         log::info!("Invoking bootloader");
         ti_sbl::invoke_bootloader(
             &mut port,
-            opts.bootloader_inverted,
-            !opts.bootloader_active_low,
+            global_args.bootloader_inverted,
+            !global_args.bootloader_active_low,
         )
         .context("Failed to invoke bootloader")?;
     }
 
     log::info!("Initializing communications with the device");
-    let mut device = ti_sbl::Device::new(port, opts.family)
+    let mut device = ti_sbl::Device::new(port, global_args.family)
         .context("Failed to synchronize with the bootloader")?;
 
     log::info!("Pinging device");
@@ -209,7 +108,7 @@ fn main() -> Result<()> {
         anyhow::bail!("Ping command wasn't acknowledged");
     }
 
-    if opts.enable_xosc {
+    if global_args.enable_xosc {
         device.set_xosc().context("Couldn't switch to XOSC")?;
         todo!();
     }
@@ -231,18 +130,18 @@ fn main() -> Result<()> {
         );
     }
 
-    match matches.subcommand() {
+    match args.subcommand() {
         ("flash", Some(m)) => flash::flash(m, flash_size, &mut device)?,
         _ => {
             println!("Error: Sub-command required");
-            println!("{}", matches.usage());
+            println!("{}", args.usage());
         }
     }
 
     Ok(())
 }
 
-struct Opts {
+struct GlobalArgs {
     #[cfg(unix)]
     port: PathBuf,
     #[cfg(windows)]
@@ -255,7 +154,7 @@ struct Opts {
     bootloader_active_low: bool,
 }
 
-impl Opts {
+impl GlobalArgs {
     pub fn port_to_string(&self) -> String {
         #[cfg(unix)]
         let port = self.port.display().to_string();
@@ -263,17 +162,6 @@ impl Opts {
         let port = self.port.to_string_lossy();
 
         port
-    }
-}
-
-fn family_from_str(s: &str) -> Result<ti_sbl::Family> {
-    match s {
-        "cc2538" => Ok(ti_sbl::Family::CC2538),
-        "cc26x0" => Ok(ti_sbl::Family::CC26X0),
-        "cc26x2" => Ok(ti_sbl::Family::CC26X2),
-        _ => Err(Error::msg(format!(
-            "invalid family, must be one of: `cc2538`, `cc26x0`, `cc26x2`."
-        ))),
     }
 }
 
@@ -294,50 +182,6 @@ fn baudrate_to_usize(baudrate: serial::BaudRate) -> usize {
     }
 }
 
-fn init_logger(level: log::LevelFilter) -> Result<()> {
-    let mut logger = env_logger::Builder::from_env("TI_SBL_LOG");
-    logger.filter_level(level);
-
-    #[cfg(unix)]
-    logger.format(log_format_color);
-    #[cfg(not(unix))]
-    logger.format(log_format_no_color);
-
-    logger.try_init().context("Failed to initialize logger")
-}
-
-#[cfg(unix)]
-fn log_format_color(
-    fmt: &mut env_logger::fmt::Formatter,
-    record: &log::Record<'_>,
-) -> io::Result<()> {
-    let level = match record.level() {
-        log::Level::Error => ansi_term::Color::Red.bold().paint("ERROR"),
-        log::Level::Warn => ansi_term::Color::Yellow.bold().paint("WARN"),
-        log::Level::Info => ansi_term::Color::Green.bold().paint("INFO"),
-        log::Level::Debug => ansi_term::Color::Cyan.bold().paint("DBG"),
-        log::Level::Trace => ansi_term::Color::Cyan.bold().paint("TRACE"),
-    };
-
-    writeln!(fmt, "[{}] - {}", level, record.args())
-}
-
-#[cfg(not(unix))]
-fn log_format_no_color(
-    fmt: &mut env_logger::fmt::Formatter,
-    record: &log::Record<'_>,
-) -> io::Result<()> {
-    let level = match record.level() {
-        log::Level::Error => "ERROR",
-        log::Level::Warn => "WARN",
-        log::Level::Info => "INFO",
-        log::Level::Debug => "DBG",
-        log::Level::Trace => "TRACE",
-    };
-
-    writeln!(fmt, "[{}] - {}", level, record.args())
-}
-
 fn format_addr(addr: [u8; 8]) -> String {
     format!(
         "{:X}{:X}:{:X}{:X}:{:X}{:X}:{:X}{:X}:{:X}{:X}:{:X}{:X}:{:X}{:X}:{:X}{:X}",
@@ -350,4 +194,102 @@ fn format_addr(addr: [u8; 8]) -> String {
         addr[6] >> 4, addr[6] & 0x0F,
         addr[7] >> 4, addr[7] & 0x0F,
     )
+}
+
+fn cli() -> App<'static, 'static> {
+    let app = App::new("TI Serial Interface Bootloader Programmer")
+        .usage("ti-sbl-prog [OPTIONS] [SUBCOMMAND] ")
+        .setting(AppSettings::ColoredHelp)
+        .version(crate_version!())
+        .author(crate_authors!())
+        .about("Programmer for Texas Instruments Serial Interface Bootloader\nProject homepage: https://github.com/btcven/ti-bootloader")
+        .arg(
+            opt("port", "Serial port to use")
+                .short("p")
+                .required(true)
+                .default_value(DEFAULT_PORT)
+        )
+        .arg(
+            opt("family", "Family: cc2538, cc26x0, cc26x2")
+                .required(true)
+                .default_value("cc26x2")
+        )
+        .arg(
+            opt("baudrate", "Serial port baudrate")
+                .short("b")
+                .required(true)
+                .default_value("500000")
+        )
+        .arg(
+            opt("enable-xosc", "Switch to XOSC (only for `cc2538` family)")
+                .short("x")
+        )
+        .arg(
+            opt(
+                "bl-invoke",
+                "Invoke the bootloader by toggling the DTR/CTS pins (on supported boards). By default DTR is connected to the bootloader pin (the pin set on CCA/CCFG) and RTS is connected to !RESET. To invert this, use --bl-inverted. The default level of the bootloader pin is active high, to use an active low polarity use --bl-active-low"
+            )
+        )
+        .arg(
+            opt(
+                "bl-inverted",
+                "Invert the pins when using --bl-invoke flag, this sets DTR to !RESET and RTS to bootloader pin"
+            )
+        )
+        .arg(
+            opt(
+                "bl-active-low",
+                "Use an active-low level when using --bl-invoke flag, this sets level of the bootloader pin to active-low"
+            )
+        )
+        .arg(
+            opt("verbose", "Use verbose output: -v (debug), -vv (trace)")
+                .short("v")
+                .multiple(true)
+        )
+        .subcommand(
+            SubCommand::with_name("flash")
+                .about("Flash a binary file")
+                .setting(AppSettings::ColoredHelp)
+                .arg(
+                    Arg::with_name("BIN")
+                        .required(true)
+                        .takes_value(true)
+                        .help("Binary file to flash")
+                )
+                .arg(
+                    opt(
+                        "address",
+                        "Address in memory where the binary contents will be flashed"
+                    )
+                        .short("a")
+                        .required(true)
+                        .default_value("0x00000000")
+                )
+                .arg(
+                    opt(
+                        "write-erase",
+                        "Erase first before writing the binary contents, this will erase up to N bytes where N is the binary file size at the specified --address"
+                    )
+                        .short("e")
+                )
+                .arg(
+                    opt(
+                        "force",
+                        "Force the write of the CCFG. Warning: may lock yourself out of the device."
+                    )
+                        .short("f")
+                )
+            );
+
+    // When double clicking the binary the binary will be paused. Useful on
+    // windows, since the Console window will be closed inmediately.
+    #[cfg(windows)]
+    let app = app.setting(AppSettings::WaitOnError);
+
+    app
+}
+
+fn opt(name: &'static str, help: &'static str) -> Arg<'static, 'static> {
+    Arg::with_name(name).long(name).help(help)
 }

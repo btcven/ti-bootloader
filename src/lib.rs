@@ -37,130 +37,12 @@ use std::{
 use serial::SerialPort;
 
 #[rustfmt::skip]
-mod constants {
-    pub const CMD_PING: u8                  = 0x20;
-    pub const CMD_DOWNLOAD: u8              = 0x21;
-    pub const _CC2538_CMD_RUN: u8           = 0x22;
-    pub const CMD_GET_STATUS: u8            = 0x23;
-    pub const CMD_SEND_DATA: u8             = 0x24;
-    pub const _CMD_RESET: u8                = 0x25;
-    pub const CC2538_CMD_ERASE: u8          = 0x26;
-    pub const CC26X0_CMD_SECTOR_ERASE: u8   = 0x26;
-    pub const _CMD_CRC32: u8                = 0x27;
-    pub const CMD_GET_CHIP_ID: u8           = 0x28;
-    pub const CC2538_CMD_SET_XOSC: u8       = 0x29;
-    pub const CMD_MEMORY_READ: u8           = 0x2A;
-    pub const _CMD_MEMORY_WRITE: u8         = 0x2B;
-    pub const _CC26X0_CMD_BANK_ERASE: u8    = 0x2C;
-    pub const _CC26X0_CMD_SET_CCFG: u8      = 0x2D;
-    pub const _CC26X2_CMD_DOWNLOAD_CRC: u8  = 0x2F;
-
-    pub const ACK: u8                       = 0xCC;
-    pub const NACK: u8                      = 0x33;
-}
-
-pub const MAX_BYTES_PER_TRANSFER: usize = 252;
-
-pub const COMMAND_RET_SUCCESS: u8 = 0x40;
-pub const COMMAND_RET_UNKNOWN_CMD: u8 = 0x41;
-pub const COMMAND_RET_INVALID_CMD: u8 = 0x42;
-pub const COMMAND_RET_INVALID_ADR: u8 = 0x43;
-pub const COMMAND_RET_FLASH_FAIL: u8 = 0x44;
-
+pub mod constants;
 pub mod util;
 
-/// The type of the bootloader.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum Family {
-    /// CC2538 microcontrollers.
-    CC2538,
-    /// CC26x0 and CC13x0 microcontrollers.
-    CC26X0,
-    /// CC26x2 and CC13x2 microcontrollers.
-    CC26X2,
-}
+mod family;
+pub use self::family::Family;
 
-impl Family {
-    /// Whether the device supports `COMMAND_RUN`.
-    ///
-    /// - **Note:** supported only on [`Family::CC2538`].
-    #[inline]
-    pub fn supports_run(&self) -> bool {
-        matches!(*self, Family::CC2538)
-    }
-    /// Whether the device supports `COMMAND_ERASE`.
-    ///
-    /// - **Note:** supported only on [`Family::CC2538`].
-    #[inline]
-    pub fn supports_erase(&self) -> bool {
-        matches!(*self, Family::CC2538)
-    }
-
-    /// Whether the device supports `COMMAND_SECTOR_ERASE`.
-    ///
-    /// - **Note:** supported only on [`Family::CC26X0`] and [`Family::CC26X2`].
-    #[inline]
-    pub fn supports_sector_erase(&self) -> bool {
-        matches!(*self, Family::CC26X0 | Family::CC26X2)
-    }
-
-    /// Whether the device supports `COMMAND_SET_XOSC`.
-    ///
-    /// - **Note:** supported only on [`Family::CC2538`].
-    #[inline]
-    pub fn supports_set_xosc(&self) -> bool {
-        matches!(*self, Family::CC2538)
-    }
-
-    /// Whether the device supports `COMMAND_BANK_ERASE`.
-    ///
-    /// - **Note:** supported only on [`Family::CC26X0`] and [`Family::CC26X2`].
-    #[inline]
-    pub fn supports_bank_erase(&self) -> bool {
-        matches!(*self, Family::CC26X0 | Family::CC26X2)
-    }
-
-    /// Whether the device supports `COMMAND_SET_CCFG`.
-    ///
-    /// - **Note:** supported only on [`Family::CC26X0`] and [`Family::CC26X2`].
-    #[inline]
-    pub fn supports_set_ccfg(&self) -> bool {
-        matches!(*self, Family::CC26X0 | Family::CC26X2)
-    }
-
-    /// Whether the device supports `COMMAND_DOWNLOAD_CRC`.
-    ///
-    /// - **Note:** supported only on [`Family::CC26X2`].
-    #[inline]
-    pub fn supports_download_crc(&self) -> bool {
-        matches!(*self, Family::CC26X2)
-    }
-
-    /// Sector erase size, in bytes.
-    #[inline]
-    pub fn sector_size(&self) -> u32 {
-        match *self {
-            Family::CC2538 => 2048,
-            Family::CC26X0 => 4092,
-            Family::CC26X2 => 8192,
-        }
-    }
-
-    /// Flash base size.
-    #[inline]
-    pub fn flash_base(&self) -> u32 {
-        match *self {
-            Family::CC2538 => 0x00200000,
-            Family::CC26X0 | Family::CC26X2 => 0x00000000,
-        }
-    }
-
-    /// Convert a flash address to the flash page.
-    #[inline]
-    pub fn address_to_page(&self, address: u32) -> u32 {
-        (address - self.flash_base()) / self.sector_size()
-    }
-}
 
 /// A TI connected device supporting the Serial Bootloader Interface
 /// (SBL).
@@ -435,12 +317,12 @@ where
     /// # Panics
     ///
     /// This function will panic if the `data` length in bytes is
-    /// higher than [`MAX_BYTES_PER_TRANSFER`].
+    /// higher than [`constans::MAX_BYTES_PER_TRANSFER`].
     pub fn send_data<D>(&mut self, data: &D) -> io::Result<bool>
     where
         D: AsRef<[u8]>,
     {
-        assert!(data.as_ref().len() <= MAX_BYTES_PER_TRANSFER);
+        assert!(data.as_ref().len() <= constants::MAX_BYTES_PER_TRANSFER);
 
         self.write_cmd(constants::CMD_SEND_DATA, data)?;
         self.read_ack()

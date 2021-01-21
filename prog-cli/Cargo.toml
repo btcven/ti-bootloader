@@ -5,14 +5,19 @@ authors = ["Locha Mesh Developers <locha@contact.io>"]
 edition = "2018"
 
 [dependencies]
+ti-sbl = { path = "..", version = "0.1" }
+
 clap = "2"
 anyhow = "1"
 
 log = "0.4"
 env_logger = "0.8"
-
-ti-sbl = { path = "..", version = "0.1" }
+pretty_env_logger = { version = "0.4", optional = true }
 serial = "0.4"
 
 [target.'cfg(unix)'.dependencies]
 ansi_term = "0.12"
+
+[features]
+default = ["pretty-env-logger"]
+pretty-env-logger = ["pretty_env_logger"]
