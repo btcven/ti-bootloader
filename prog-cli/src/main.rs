@@ -18,7 +18,7 @@ use std::{path::PathBuf, time::Duration};
 
 use serial::SerialPort;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use clap::{crate_authors, crate_version, App, AppSettings, Arg, SubCommand};
 
 mod flash;
@@ -79,9 +79,13 @@ fn main() -> Result<()> {
 
     log::info!("Opening serial port `{}`", global_args.port_to_string());
     log::info!("Baudrate: {}", baudrate_to_usize(global_args.baudrate));
-    let mut port = serial::SystemPort::open(&global_args.port).with_context(|| {
-        format!("Couldn't open serial port `{}`", global_args.port_to_string())
-    })?;
+    let mut port =
+        serial::SystemPort::open(&global_args.port).with_context(|| {
+            format!(
+                "Couldn't open serial port `{}`",
+                global_args.port_to_string()
+            )
+        })?;
 
     let mut settings = ti_sbl::port_settings();
     settings.baud_rate = global_args.baudrate;

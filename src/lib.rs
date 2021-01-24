@@ -43,7 +43,6 @@ pub mod util;
 mod family;
 pub use self::family::Family;
 
-
 /// A TI connected device supporting the Serial Bootloader Interface
 /// (SBL).
 pub struct Device<P> {

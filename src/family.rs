@@ -15,7 +15,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{error::Error, fmt::{self, Formatter, Display}, str::FromStr};
+use std::{
+    error::Error,
+    fmt::{self, Display, Formatter},
+    str::FromStr,
+};
 
 /// The type of the bootloader.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]

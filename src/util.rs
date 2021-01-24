@@ -24,15 +24,12 @@
 use std::{convert::TryInto, io};
 
 use crate::{
-    Device, Family,
     constants::{
-        COMMAND_RET_FLASH_FAIL,
-        COMMAND_RET_INVALID_ADR,
-        COMMAND_RET_INVALID_CMD,
-        COMMAND_RET_SUCCESS,
-        COMMAND_RET_UNKNOWN_CMD,
+        COMMAND_RET_FLASH_FAIL, COMMAND_RET_INVALID_ADR,
+        COMMAND_RET_INVALID_CMD, COMMAND_RET_SUCCESS, COMMAND_RET_UNKNOWN_CMD,
         MAX_BYTES_PER_TRANSFER,
     },
+    Device, Family,
 };
 
 /// CC26xx/CC13xx CCFG size in bytes.
@@ -49,17 +46,21 @@ const CC26XX_FCFG1_O_MAC_15_4_0: u32 = 0x000002F0;
 const CC2538_FLASH_CTRL_O_DIECFG0: u32 = 0x400D3014;
 
 /// Erase a flash range.
-pub fn erase_flash_range<P>(
+pub fn erase_flash_range<P, F>(
     device: &mut Device<P>,
     start_address: u32,
     byte_count: u32,
+    mut progress: F,
 ) -> io::Result<()>
 where
     P: serial::SerialPort,
+    F: FnMut(f32, u32),
 {
     let family = device.family();
     if family.supports_erase() {
+        progress(0.0, 0);
         device.erase(start_address, byte_count)?;
+        progress(100.0, start_address + byte_count);
     } else if family.supports_sector_erase() {
         let sector_size = family.sector_size();
         let sector_count = if (byte_count % sector_size) != 0 {
@@ -71,6 +72,8 @@ where
         for i in 0..sector_count {
             let sector_address = start_address + (i * sector_size);
             log::info!("Erasing sector #{}, address: {:#X}", i, sector_address);
+
+            progress((100.0 * i as f32) / sector_count as f32, sector_address);
 
             device.sector_erase(sector_address)?;
 
@@ -105,12 +108,14 @@ pub struct Transfer<'a> {
 }
 
 /// Write the flash.
-pub fn write_flash_range<'a, P>(
+pub fn write_flash_range<'a, P, F>(
     device: &mut Device<P>,
     transfers: &[Transfer<'a>],
+    mut progress: F,
 ) -> io::Result<()>
 where
     P: serial::SerialPort,
+    F: FnMut(usize, f32, u32, u32),
 {
     let family = device.family();
 
@@ -156,6 +161,13 @@ where
                 chunk_index,
                 chunk.len(),
                 chunk_addr
+            );
+
+            progress(
+                txfer_index,
+                (100.0 * chunk_index as f32) / chunks as f32,
+                chunk_index,
+                chunk_addr,
             );
 
             let ack = device.send_data(&chunk)?;

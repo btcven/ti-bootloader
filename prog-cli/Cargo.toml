@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 ti-sbl = { path = "..", version = "0.1" }
+serial = "0.4"
 
 clap = "2"
 anyhow = "1"
@@ -13,7 +14,8 @@ anyhow = "1"
 log = "0.4"
 env_logger = "0.8"
 pretty_env_logger = { version = "0.4", optional = true }
-serial = "0.4"
+
+indicatif = "0.15"
 
 [target.'cfg(unix)'.dependencies]
 ansi_term = "0.12"

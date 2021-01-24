@@ -22,6 +22,7 @@ use ti_sbl::{
 
 use anyhow::{bail, Context, Result};
 use clap::ArgMatches;
+use indicatif::{ProgressBar, ProgressStyle};
 
 /// Flash subcommand entry point.
 pub fn flash(
@@ -84,8 +85,29 @@ pub fn flash(
             binary.len()
         };
 
-        ti_sbl::util::erase_flash_range(device, args.address, len as u32)
-            .context("Couldn't erase flash")?;
+        let progress_style = ProgressStyle::default_spinner()
+            .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ")
+            .template("{prefix:.bold.dim} {spinner} {wide_msg}");
+
+        let progress_bar = ProgressBar::new(100);
+        progress_bar.set_style(progress_style);
+        progress_bar.set_message("Erasing sectors");
+
+        ti_sbl::util::erase_flash_range(
+            device,
+            args.address,
+            len as u32,
+            |progress, addr| {
+                progress_bar.set_message(&format!(
+                    "{:.1} - Erasing sector {:#X}",
+                    progress, addr
+                ));
+                progress_bar.inc(1);
+            },
+        )
+        .context("Couldn't erase flash")?;
+
+        progress_bar.finish_with_message("Sectors erased");
     }
 
     let end_addr = args.address + binary.len() as u32;
@@ -124,9 +146,27 @@ pub fn flash(
             expect_ack: true,
         }]
     };
+    let progress_style = ProgressStyle::default_spinner()
+        .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ")
+        .template("{prefix:.bold.dim} {spinner} {wide_msg}");
 
-    ti_sbl::util::write_flash_range(device, &transfers)
-        .context("Couldn't flash binary")?;
+    let progress_bar = ProgressBar::new(100);
+    progress_bar.set_style(progress_style);
+    progress_bar.set_message("Writing flash");
+
+    ti_sbl::util::write_flash_range(
+        device,
+        &transfers,
+        |txfer, progress, chunk_index, chunk_addr| {
+            progress_bar.set_message(&format!(
+                "{:.1} Writing flash, transfer #{}, chunk #{} ({:#X})",
+                progress, txfer, chunk_index, chunk_addr
+            ));
+            progress_bar.inc(1);
+        },
+    )
+    .context("Couldn't flash binary")?;
+    progress_bar.finish_with_message("Transfers finished");
 
     Ok(())
 }
