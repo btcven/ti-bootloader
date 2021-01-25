@@ -13,7 +13,7 @@
 This is a command line tool and Rust library to flash/read Texas Instruments
 microcontrollers that support the serial bootloader. 
 
-# [Documentation](https://github.io/btcven/ti-bootloader)
+# [Documentation](https://btcven.github.io/ti-bootloader/ti_sbl/index.html)
 
 # License
 
