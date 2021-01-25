@@ -39,6 +39,7 @@ use serial::SerialPort;
 
 #[rustfmt::skip]
 pub mod constants;
+pub mod ports;
 pub mod util;
 
 mod family;

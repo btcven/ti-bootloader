@@ -22,9 +22,10 @@ use anyhow::{bail, Context, Result};
 use clap::{crate_authors, crate_version, App, AppSettings, Arg, SubCommand};
 
 mod flash;
+mod list;
 
-#[cfg(unix)]
-const DEFAULT_PORT: &str = "/dev/ttyACM0";
+#[cfg(target_os = "linux")]
+const DEFAULT_PORT: &str = "/dev/ttyUSB0";
 #[cfg(windows)]
 const DEFAULT_PORT: &str = "COM0";
 
@@ -36,106 +37,122 @@ fn main() -> Result<()> {
 
     let args = cli().get_matches_safe()?;
 
-    // Sanity checks first
-    if args.is_present("bl-inverted") && !args.is_present("bl-invoke") {
-        bail!("--bl-inverted can't be used if --bl-invoke is not specified. See --help for more information");
-    }
-
-    if args.is_present("bl-active-low") && !args.is_present("bl-invoke") {
-        bail!("--bl-active-low can't be used if --bl-invoke is not specified. See --help for more information");
-    }
-
-    let global_args = GlobalArgs {
-        #[cfg(unix)]
-        port: args.value_of("port").unwrap().parse()?,
-        #[cfg(windows)]
-        port: args.value_of("port").unwrap().map(OsString::from),
-        family: args.value_of("family").unwrap().parse()?,
-        baudrate: args.value_of("baudrate").unwrap().parse::<usize>().map(
-            |v| match v {
-                110 => serial::BaudRate::Baud110,
-                300 => serial::BaudRate::Baud300,
-                600 => serial::BaudRate::Baud600,
-                1200 => serial::BaudRate::Baud1200,
-                2400 => serial::BaudRate::Baud2400,
-                4800 => serial::BaudRate::Baud4800,
-                9600 => serial::BaudRate::Baud9600,
-                19200 => serial::BaudRate::Baud19200,
-                38400 => serial::BaudRate::Baud38400,
-                57600 => serial::BaudRate::Baud57600,
-                115200 => serial::BaudRate::Baud115200,
-                n => serial::BaudRate::BaudOther(n),
-            },
-        )?,
-        enable_xosc: args.is_present("enable-xosc"),
-        bootloader_invoke: args.is_present("bl-invoke"),
-        bootloader_inverted: args.is_present("bl-inverted"),
-        bootloader_active_low: args.is_present("bl-active-low"),
-    };
-
-    if global_args.enable_xosc && !global_args.family.supports_set_xosc() {
-        anyhow::bail!("XOSC can only be enabled on CC2538 family");
-    }
-
-    log::info!("Opening serial port `{}`", global_args.port_to_string());
-    log::info!("Baudrate: {}", baudrate_to_usize(global_args.baudrate));
-    let mut port =
-        serial::SystemPort::open(&global_args.port).with_context(|| {
-            format!(
-                "Couldn't open serial port `{}`",
-                global_args.port_to_string()
-            )
-        })?;
-
-    let mut settings = ti_sbl::port_settings();
-    settings.baud_rate = global_args.baudrate;
-
-    port.set_timeout(Duration::from_millis(200))?;
-    port.configure(&settings)?;
-
-    if global_args.bootloader_invoke {
-        log::info!("Invoking bootloader");
-        ti_sbl::invoke_bootloader(
-            &mut port,
-            global_args.bootloader_inverted,
-            !global_args.bootloader_active_low,
-        )
-        .context("Failed to invoke bootloader")?;
-    }
-
-    log::info!("Initializing communications with the device");
-    let mut device = ti_sbl::Device::new(port, global_args.family)
-        .context("Failed to synchronize with the bootloader")?;
-
-    log::info!("Pinging device");
-    if !device.ping()? {
-        anyhow::bail!("Ping command wasn't acknowledged");
-    }
-
-    if global_args.enable_xosc {
-        device.set_xosc().context("Couldn't switch to XOSC")?;
-        todo!();
-    }
-
-    let flash_size = ti_sbl::util::read_flash_size(&mut device)
-        .context("Couldn't read flash size")?;
-    log::info!("Flash size: {} K", flash_size / 1024);
-
-    let chip_id = device.get_chip_id().context("Couldn't read chip ID")?;
-    log::info!("Chip ID: {:#X}", chip_id);
-
-    let (primary, secondary) = ti_sbl::util::read_ieee_address(&mut device)
-        .context("Couldn't read IEEE 802.15.4 address")?;
-    log::info!("IEEE 802.15.4g primary address: {}", format_addr(primary));
-    if secondary != ti_sbl::util::INVALID_ADDR {
-        log::info!(
-            "IEEE 802.15.4g secondary address: {}",
-            format_addr(secondary)
-        );
-    }
-
     match args.subcommand() {
-        ("flash", Some(m)) => flash::flash(m, flash_size, &mut device)?,
+        ("flash", Some(m)) => {
+            // Sanity checks first
+            if args.is_present("bl-inverted") && !args.is_present("bl-invoke") {
+                bail!("--bl-inverted can't be used if --bl-invoke is not specified. See --help for more information");
+            }
+
+            if args.is_present("bl-active-low") && !args.is_present("bl-invoke")
+            {
+                bail!("--bl-active-low can't be used if --bl-invoke is not specified. See --help for more information");
+            }
+
+            let global_args = GlobalArgs {
+                #[cfg(unix)]
+                port: args.value_of("port").unwrap().parse()?,
+                #[cfg(windows)]
+                port: args.value_of("port").unwrap().map(OsString::from),
+                family: args.value_of("family").unwrap().parse()?,
+                baudrate: args
+                    .value_of("baudrate")
+                    .unwrap()
+                    .parse::<usize>()
+                    .map(|v| match v {
+                    110 => serial::BaudRate::Baud110,
+                    300 => serial::BaudRate::Baud300,
+                    600 => serial::BaudRate::Baud600,
+                    1200 => serial::BaudRate::Baud1200,
+                    2400 => serial::BaudRate::Baud2400,
+                    4800 => serial::BaudRate::Baud4800,
+                    9600 => serial::BaudRate::Baud9600,
+                    19200 => serial::BaudRate::Baud19200,
+                    38400 => serial::BaudRate::Baud38400,
+                    57600 => serial::BaudRate::Baud57600,
+                    115200 => serial::BaudRate::Baud115200,
+                    n => serial::BaudRate::BaudOther(n),
+                })?,
+                enable_xosc: args.is_present("enable-xosc"),
+                bootloader_invoke: args.is_present("bl-invoke"),
+                bootloader_inverted: args.is_present("bl-inverted"),
+                bootloader_active_low: args.is_present("bl-active-low"),
+            };
+
+            if global_args.enable_xosc
+                && !global_args.family.supports_set_xosc()
+            {
+                anyhow::bail!("XOSC can only be enabled on CC2538 family");
+            }
+
+            log::info!(
+                "Opening serial port `{}`",
+                global_args.port_to_string()
+            );
+            log::info!("Baudrate: {}", baudrate_to_usize(global_args.baudrate));
+            let mut port = serial::SystemPort::open(&global_args.port)
+                .with_context(|| {
+                    format!(
+                        "Couldn't open serial port `{}`",
+                        global_args.port_to_string()
+                    )
+                })?;
+
+            let mut settings = ti_sbl::port_settings();
+            settings.baud_rate = global_args.baudrate;
+
+            port.set_timeout(Duration::from_millis(200))?;
+            port.configure(&settings)?;
+
+            if global_args.bootloader_invoke {
+                log::info!("Invoking bootloader");
+                ti_sbl::invoke_bootloader(
+                    &mut port,
+                    global_args.bootloader_inverted,
+                    !global_args.bootloader_active_low,
+                )
+                .context("Failed to invoke bootloader")?;
+            }
+
+            log::info!("Initializing communications with the device");
+            let mut device = ti_sbl::Device::new(port, global_args.family)
+                .context("Failed to synchronize with the bootloader")?;
+
+            log::info!("Pinging device");
+            if !device.ping()? {
+                anyhow::bail!("Ping command wasn't acknowledged");
+            }
+
+            if global_args.enable_xosc {
+                device.set_xosc().context("Couldn't switch to XOSC")?;
+                todo!();
+            }
+
+            let flash_size = ti_sbl::util::read_flash_size(&mut device)
+                .context("Couldn't read flash size")?;
+            log::info!("Flash size: {} K", flash_size / 1024);
+
+            let chip_id =
+                device.get_chip_id().context("Couldn't read chip ID")?;
+            log::info!("Chip ID: {:#X}", chip_id);
+
+            let (primary, secondary) =
+                ti_sbl::util::read_ieee_address(&mut device)
+                    .context("Couldn't read IEEE 802.15.4 address")?;
+            log::info!(
+                "IEEE 802.15.4g primary address: {}",
+                format_addr(primary)
+            );
+            if secondary != ti_sbl::util::INVALID_ADDR {
+                log::info!(
+                    "IEEE 802.15.4g secondary address: {}",
+                    format_addr(secondary)
+                );
+            }
+
+            flash::flash(m, flash_size, &mut device)?
+        }
+        ("list", _) => list::list()?,
         _ => {
             println!("Error: Sub-command required");
             println!("{}", args.usage());
@@ -201,18 +218,20 @@ fn format_addr(addr: [u8; 8]) -> String {
 }
 
 fn cli() -> App<'static, 'static> {
+    let port = opt("port", "Serial port to use").short("p").required(true);
+
+    // Only linux and windows provide consistent behaviour
+    // regarding serial ports.
+    #[cfg(any(windows, target_os = "linux"))]
+    let port = port.default_value(DEFAULT_PORT);
+
     let app = App::new("TI Serial Interface Bootloader Programmer")
         .usage("ti-sbl-prog [OPTIONS] [SUBCOMMAND] ")
         .setting(AppSettings::ColoredHelp)
         .version(crate_version!())
         .author(crate_authors!())
         .about("Programmer for Texas Instruments Serial Interface Bootloader\nProject homepage: https://github.com/btcven/ti-bootloader")
-        .arg(
-            opt("port", "Serial port to use")
-                .short("p")
-                .required(true)
-                .default_value(DEFAULT_PORT)
-        )
+        .arg(port)
         .arg(
             opt("family", "Family: cc2538, cc26x0, cc26x2")
                 .required(true)
@@ -284,7 +303,12 @@ fn cli() -> App<'static, 'static> {
                     )
                         .short("f")
                 )
-            );
+            )
+        .subcommand(
+            SubCommand::with_name("list")
+                .about("List available serial ports")
+                .setting(AppSettings::ColoredHelp)
+        );
 
     // When double clicking the binary the binary will be paused. Useful on
     // windows, since the Console window will be closed inmediately.
