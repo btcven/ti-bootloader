@@ -317,7 +317,7 @@ where
     /// # Panics
     ///
     /// This function will panic if the `data` length in bytes is
-    /// higher than [`constans::MAX_BYTES_PER_TRANSFER`].
+    /// higher than [`constants::MAX_BYTES_PER_TRANSFER`].
     pub fn send_data<D>(&mut self, data: &D) -> io::Result<bool>
     where
         D: AsRef<[u8]>,
@@ -456,8 +456,6 @@ where
     /// is higher than `63 * 4` bytes, this is the maximum number of accesses
     /// that can be done using this mode.
     /// - This function will panic if the `address` is not aligned to 32-bits.
-    ///
-    /// See [`util::memory_read_32`] for an easy to use version of this function.
     pub fn memory_read_32(
         &mut self,
         address: u32,
