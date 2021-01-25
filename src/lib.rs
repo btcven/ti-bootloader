@@ -22,6 +22,7 @@
 //!
 //! # Tested with the following chips
 //!
+//! - [CC1312R](https://www.ti.com/product/CC1312R)
 //! - [CC1352P](https://www.ti.com/product/CC1352P)
 //!
 //! # See also
