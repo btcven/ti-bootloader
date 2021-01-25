@@ -11,7 +11,44 @@
 <h1 align="center">TI bootloader</h1>
 
 This is a command line tool and Rust library to flash/read Texas Instruments
-microcontrollers that support the serial bootloader. 
+microcontrollers that support the serial bootloader.
+
+# Installation
+
+Install Rust stable using your package manager or preferably, from [rustup.rs].
+
+[rustup.rs]: https://rustup.rs/
+
+And clone the repository with:
+
+```
+git clone https://github.com/btcven/ti-bootloader
+```
+
+Build and install the binary with:
+
+```
+cargo install --path ti-bootloader/prog-cli
+```
+
+Your binary will be installed in the `.cargo/bin` directory, depending on your os,
+make sure it is on your `PATH` environment variable.
+
+To display the usage:
+
+```
+ti-sbl-prog --help
+```
+
+# Flashing a binary
+
+This command will flash a binary (`hello-world.bin`) onto your device (make
+sure it's on bootloader mode), using a baud rate of 1.5 mbauds, for the
+`cc26x2` family of MCUs, and erasing sectors before writing.
+
+```
+ti-sbl-prog -p /dev/ttyUSB0 flash hello-world.bin --write-erase --family cc26x2 --baudrate 1500000
+```
 
 # [Documentation](https://btcven.github.io/ti-bootloader/ti_sbl/index.html)
 
