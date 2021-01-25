@@ -29,6 +29,9 @@
 //!
 //! - [CC2538/CC26x0/CC26x2 Serial Bootloader Interface](https://www.ti.com/lit/an/swra466c/swra466c.pdf).
 
+#![doc(html_logo_url = "https://locha.io/i/128.png")]
+#![doc(html_favicon_url = "https://locha.io/i/128.png")]
+
 use std::{
     cmp::Ordering,
     fmt, io,
