@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["ti_sbl"] = [{"text":"impl Debug for PortInfo","synthetic":false,"types":[]},{"text":"impl Debug for PortUsbInfo","synthetic":false,"types":[]},{"text":"impl&lt;'a&gt; Debug for Transfer&lt;'a&gt;","synthetic":false,"types":[]},{"text":"impl Debug for Family","synthetic":false,"types":[]},{"text":"impl&lt;P&gt; Debug for Device&lt;P&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;P: SerialPort,&nbsp;</span>","synthetic":false,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

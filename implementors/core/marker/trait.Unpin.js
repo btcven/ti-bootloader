@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["ti_sbl"] = [{"text":"impl&lt;P&gt; Unpin for Device&lt;P&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;P: Unpin,&nbsp;</span>","synthetic":true,"types":[]},{"text":"impl Unpin for Family","synthetic":true,"types":[]},{"text":"impl Unpin for PortInfo","synthetic":true,"types":[]},{"text":"impl Unpin for PortUsbInfo","synthetic":true,"types":[]},{"text":"impl&lt;'a&gt; Unpin for Transfer&lt;'a&gt;","synthetic":true,"types":[]}];
+implementors["ti_sbl_prog"] = [{"text":"impl Unpin for GlobalArgs","synthetic":true,"types":[]},{"text":"impl Unpin for FlashArgs","synthetic":true,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

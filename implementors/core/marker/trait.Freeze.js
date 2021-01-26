@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["ti_sbl"] = [{"text":"impl&lt;P&gt; Freeze for Device&lt;P&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;P: Freeze,&nbsp;</span>","synthetic":true,"types":[]},{"text":"impl Freeze for Family","synthetic":true,"types":[]},{"text":"impl Freeze for PortInfo","synthetic":true,"types":[]},{"text":"impl Freeze for PortUsbInfo","synthetic":true,"types":[]},{"text":"impl&lt;'a&gt; Freeze for Transfer&lt;'a&gt;","synthetic":true,"types":[]}];
+implementors["ti_sbl_prog"] = [{"text":"impl Freeze for GlobalArgs","synthetic":true,"types":[]},{"text":"impl Freeze for FlashArgs","synthetic":true,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

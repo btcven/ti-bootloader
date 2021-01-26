@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["ti_sbl"] = [{"text":"impl&lt;P&gt; Send for Device&lt;P&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;P: Send,&nbsp;</span>","synthetic":true,"types":[]},{"text":"impl Send for Family","synthetic":true,"types":[]},{"text":"impl Send for PortInfo","synthetic":true,"types":[]},{"text":"impl Send for PortUsbInfo","synthetic":true,"types":[]},{"text":"impl&lt;'a&gt; Send for Transfer&lt;'a&gt;","synthetic":true,"types":[]}];
+implementors["ti_sbl_prog"] = [{"text":"impl Send for GlobalArgs","synthetic":true,"types":[]},{"text":"impl Send for FlashArgs","synthetic":true,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
