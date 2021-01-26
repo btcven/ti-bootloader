@@ -22,7 +22,7 @@ mod list_macos;
 mod list_windows;
 
 /// Information about an available serial port.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PortInfo {
     pub port: OsString,
     pub name: OsString,
@@ -48,7 +48,7 @@ impl PortInfo {
 }
 
 /// Information about USB serial ports.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PortUsbInfo {
     /// Number of interfaces in this device.
     pub num_if: usize,
