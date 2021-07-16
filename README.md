@@ -55,7 +55,7 @@ ti-sbl-prog -p /dev/ttyUSB0 flash hello-world.bin --write-erase --family cc26x2 
 # License
 
 ```
-Copyright 2021 Locha Mesh Developers <contact@locha.io>
+Copyright 2021 btcven and Locha Mesh Developers <contact@locha.io>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
